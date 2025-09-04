@@ -1,0 +1,13 @@
+{
+  "articles": [
+    {"id":"A1","nom":"Chaise pliante","categorie":"Chaises","description":"Chaise basique","prixJour":100,"qteTotale":100,"qteCasse":5,"seuilAlerte":10,"cautionUnit":0,"actif":true},
+    {"id":"A2","nom":"Table rectangulaire","categorie":"Tables","description":"Table 180cm","prixJour":800,"qteTotale":20,"qteCasse":0,"seuilAlerte":2,"cautionUnit":0,"actif":true},
+    {"id":"A3","nom":"Sono 500W","categorie":"Sonorisation","description":"Pack sono","prixJour":3000,"qteTotale":5,"qteCasse":0,"seuilAlerte":1,"cautionUnit":0,"actif":true}
+  ],
+  "reservations": [
+    {"id":"R1","dateDebut":"2025-09-10","dateFin":"2025-09-12","clientNom":"Entreprise A","clientTel":"0555000000","note":"50 chaises","statut":"confirmee","acompte":0,"createdAt":"2025-09-01T10:00:00.000Z","updatedAt":"2025-09-01T10:00:00.000Z"}
+  ],
+  "reservationItems": [
+    {"id":"RI1","reservationId":"R1","articleId":"A1","qte":50,"prixJourSnapshot":100}
+  ]
+}

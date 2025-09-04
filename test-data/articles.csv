@@ -1,0 +1,4 @@
+id;nom;categorie;prixJour;qteTotale;qteCasse;seuilAlerte;cautionUnit;actif
+A10;Tente 3x3;Décor;1500;10;0;1;;1
+A11;Guirlande LED;Décor;200;50;2;5;;1
+A12;Verre à eau;Vaisselle;20;200;10;20;;1
