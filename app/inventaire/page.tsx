@@ -5,7 +5,6 @@ import type { Article } from '@/lib/models';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { exportDump, importDump } from '@/lib/storage';
-import { qteDisponible } from '@/lib/availability';
 
 const isoToday = () => new Date().toISOString().slice(0,10);
 
@@ -42,10 +41,8 @@ export default function InventairePage() {
   const clearAll = async () => {
     if (!confirm('Effacer toutes les données locales ?')) return;
     const { db } = await import('@/lib/db');
-    await db.transaction('rw', db.articles, db.reservations, db.reservationItems, async () => {
+    await db.transaction('rw', db.articles, async () => {
       await db.articles.clear();
-      await db.reservations.clear();
-      await db.reservationItems.clear();
     });
     await load();
     setMsg('Base vidée.');
@@ -84,8 +81,7 @@ export default function InventairePage() {
               <TableCell>{a.qteTotale}</TableCell>
               <TableCell>{a.qteCasse}</TableCell>
               <TableCell>
-                {/* compute availability for today range */}
-                <DispoCell article={a} today={today} />
+                <DispoCell article={a} />
               </TableCell>
             </TableRow>
           ))}
@@ -95,8 +91,7 @@ export default function InventairePage() {
   );
 }
 
-function DispoCell({ article, today }: { article: Article; today: string }) {
-  const [v, setV] = useState<number | null>(null);
-  useEffect(() => { qteDisponible(article, today, today).then(setV); }, [article, today]);
-  return <span>{v ?? '...'}</span>;
+function DispoCell({ article }: { article: Article }) {
+  const v = Math.max(0, (article.qteTotale || 0) - (article.qteCasse || 0));
+  return <span>{v}</span>;
 }

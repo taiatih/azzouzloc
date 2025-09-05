@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "cp lib/pwa-sw.js public/sw.js",
     "build": "next build",
     "preview": "serve out",
     "start": "next start",

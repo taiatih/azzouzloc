@@ -1,32 +1,18 @@
 import { db } from './db';
-import { Article, Reservation, ReservationItem } from './models';
+import type { Article } from './models';
 
 export async function exportDump() {
-  const [articles, reservations, reservationItems] = await Promise.all([
-    db.articles.toArray(), db.reservations.toArray(), db.reservationItems.toArray()
-  ]);
-  return { articles, reservations, reservationItems } as {
-    articles: Article[]; reservations: Reservation[]; reservationItems: ReservationItem[];
-  };
+  const articles = await db.articles.toArray();
+  return { articles } as { articles: Article[] };
 }
 
-export async function importDump(dump: { articles: Article[]; reservations: Reservation[]; reservationItems: ReservationItem[]; }) {
+export async function importDump(dump: { articles?: Article[]; [k:string]: unknown }) {
   const collisions: string[] = [];
-  await db.transaction('rw', db.articles, db.reservations, db.reservationItems, async () => {
+  await db.transaction('rw', db.articles, async () => {
     for (const a of dump.articles || []) {
       const exists = await db.articles.get(a.id);
       if (exists) { collisions.push(`article:${a.id}`); continue; }
-      await db.articles.add(a);
-    }
-    for (const r of dump.reservations || []) {
-      const exists = await db.reservations.get(r.id);
-      if (exists) { collisions.push(`reservation:${r.id}`); continue; }
-      await db.reservations.add(r);
-    }
-    for (const i of dump.reservationItems || []) {
-      const exists = await db.reservationItems.get(i.id);
-      if (exists) { collisions.push(`reservationItem:${i.id}`); continue; }
-      await db.reservationItems.add(i);
+      await db.articles.add({ id: a.id, nom: a.nom, prixJour: a.prixJour, qteTotale: a.qteTotale, qteCasse: a.qteCasse ?? 0, actif: a.actif ?? true } as Article);
     }
   });
   return { collisions };
@@ -97,15 +83,9 @@ export async function importArticlesCSV(csv: string) {
 }
 
 export async function exportReservationsCSV() {
-  const headers = ['id','dateDebut','dateFin','clientNom','clientTel','note','statut','acompte','createdAt','updatedAt'];
-  const rows = await db.reservations.toArray();
-  const csv = [headers.join(SEP), ...rows.map(r => [r.id,r.dateDebut,r.dateFin,r.clientNom ?? '',r.clientTel ?? '',r.note ?? '',r.statut,r.acompte ?? '',r.createdAt,r.updatedAt].map(escapeCSV).join(SEP))].join('\n');
-  return csv;
+  return 'id;dateDebut;dateFin;clientNom;clientTel;note;statut;acompte;createdAt;updatedAt\n';
 }
 
 export async function exportReservationItemsCSV() {
-  const headers = ['id','reservationId','articleId','qte','prixJourSnapshot'];
-  const rows = await db.reservationItems.toArray();
-  const csv = [headers.join(SEP), ...rows.map(i => [i.id,i.reservationId,i.articleId,i.qte,i.prixJourSnapshot].map(escapeCSV).join(SEP))].join('\n');
-  return csv;
+  return 'id;reservationId;articleId;qte;prixJourSnapshot\n';
 }
