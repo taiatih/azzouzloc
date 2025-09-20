@@ -36,7 +36,7 @@ export const articleHelpers = {
     return await db.articles.toArray();
   },
   async listActifs(): Promise<Article[]> {
-    return await db.articles.where('actif').equals(1).toArray();
+    return await db.articles.filter(a => a.actif === true).toArray();
   }
 };
 
