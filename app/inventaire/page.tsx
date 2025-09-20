@@ -87,6 +87,7 @@ export default function InventairePage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      localStorage.setItem('azzouz_last_export_at', new Date().toISOString());
     } catch (error) {
       console.error('Erreur lors de l\'export:', error);
       alert('Erreur lors de l\'export');

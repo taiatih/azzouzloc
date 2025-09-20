@@ -4,6 +4,7 @@ import './globals.css';
 import SWRegister from '@/components/SWRegister';
 import AppHeader from '@/components/AppHeader';
 import MobileNav from '@/components/MobileNav';
+import BackupReminder from '@/components/BackupReminder';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -28,6 +29,7 @@ export default function RootLayout({
         <SWRegister />
         <AppHeader />
         <main className="mx-auto max-w-3xl p-4 pb-24">
+          <BackupReminder />
           {children}
         </main>
         <MobileNav />
