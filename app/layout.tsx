@@ -1,40 +1,38 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import SWRegister from "@/components/SWRegister";
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import SWRegister from '@/components/SWRegister';
+import AppHeader from '@/components/AppHeader';
+import MobileNav from '@/components/MobileNav';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Azzouz Location",
-  description: "PWA de gestion de location",
+  title: 'Azzouz Location',
+  description: "Application de gestion de location d'équipements",
 };
-
-export const viewport = { themeColor: "#111827" };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html lang="fr">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#111827" />
+        <meta name="theme-color" content="#1e40af" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-white text-gray-900`}>
+      <body className={`${inter.className} min-h-screen bg-white text-gray-900`}>
         <SWRegister />
-        {children}
+        <AppHeader />
+        <main className="mx-auto max-w-3xl p-4 pb-24">
+          {children}
+        </main>
+        <MobileNav />
       </body>
     </html>
   );
 }
+

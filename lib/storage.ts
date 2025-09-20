@@ -1,91 +1,94 @@
-import { db } from './db';
-import type { Article } from './models';
+import { db, articleHelpers, reservationHelpers, reservationItemHelpers } from "./db";
+import { Article, Reservation, ReservationItem } from "./models";
 
-export async function exportDump() {
-  const articles = await db.articles.toArray();
-  return { articles } as { articles: Article[] };
+export async function exportToJson(): Promise<string> {
+  const articles = await articleHelpers.list();
+  const reservations = await reservationHelpers.list();
+  const reservationItems = await reservationItemHelpers.list();
+  return JSON.stringify({ articles, reservations, reservationItems }, null, 2);
 }
 
-export async function importDump(dump: { articles?: Article[]; [k:string]: unknown }) {
-  const collisions: string[] = [];
-  await db.transaction('rw', db.articles, async () => {
-    for (const a of dump.articles || []) {
-      const exists = await db.articles.get(a.id);
-      if (exists) { collisions.push(`article:${a.id}`); continue; }
-      await db.articles.add({ id: a.id, nom: a.nom, prixJour: a.prixJour, qteTotale: a.qteTotale, qteCasse: a.qteCasse ?? 0, actif: a.actif ?? true } as Article);
-    }
+export async function importFromJson(jsonString: string): Promise<void> {
+  const data = JSON.parse(jsonString);
+  const { articles, reservations, reservationItems } = data;
+
+  await db.transaction("rw", db.articles, db.reservations, db.reservationItems, async () => {
+    // Clear existing data
+    await Promise.all([
+      db.articles.clear(),
+      db.reservations.clear(),
+      db.reservationItems.clear()
+    ]);
+
+    // Add new data
+    await Promise.all([
+      db.articles.bulkAdd(articles),
+      db.reservations.bulkAdd(reservations),
+      db.reservationItems.bulkAdd(reservationItems)
+    ]);
   });
-  return { collisions };
 }
 
-const SEP = ';';
-function escapeCSV(v: unknown) {
-  const s = v === undefined || v === null ? '' : String(v);
-  if (s.includes('"') || s.includes(SEP) || s.includes('\n')) return '"' + s.replaceAll('"', '""') + '"';
-  return s;
+export function exportArticlesToCsv(articles: Article[]): string {
+  const headers = ["id", "nom", "categorie", "description", "prixJour", "qteTotale", "qteCasse", "seuilAlerte", "cautionUnit", "actif"];
+  const rows = articles.map(article => 
+    `${article.id};${article.nom};${article.categorie || ""};${article.description || ""};${article.prixJour};${article.qteTotale};${article.qteCasse};${article.seuilAlerte || ""};${article.cautionUnit || ""};${article.actif ? 1 : 0}`
+  );
+  return [headers.join(";"), ...rows].join("\n");
 }
-function parseCSV(text: string): string[][] {
-  const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim().length);
-  return lines.map(line => {
-    const out: string[] = [];
-    let cur = '';
-    let inQ = false;
-    for (let i=0;i<line.length;i++){
-      const ch = line[i];
-      if (inQ) {
-        if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; }
-        else if (ch === '"') { inQ = false; }
-        else { cur += ch; }
+
+export function exportReservationsToCsv(reservations: Reservation[]): string {
+  const headers = ["id", "dateDebut", "dateFin", "clientNom", "clientTel", "note", "statut", "acompte", "createdAt", "updatedAt"];
+  const rows = reservations.map(res => 
+    `${res.id};${res.dateDebut};${res.dateFin};${res.clientNom || ""};${res.clientTel || ""};${res.note || ""};${res.statut};${res.acompte || ""};${res.createdAt};${res.updatedAt}`
+  );
+  return [headers.join(";"), ...rows].join("\n");
+}
+
+export function exportReservationItemsToCsv(items: ReservationItem[]): string {
+  const headers = ["id", "reservationId", "articleId", "qte", "prixJourSnapshot"];
+  const rows = items.map(item => 
+    `${item.id};${item.reservationId};${item.articleId};${item.qte};${item.prixJourSnapshot}`
+  );
+  return [headers.join(";"), ...rows].join("\n");
+}
+
+export async function importArticlesFromCsv(csvString: string): Promise<void> {
+  const lines = csvString.split("\n");
+  const headers = lines[0].split(";");
+  const articles: Article[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(";");
+    if (values.length === headers.length) {
+      const article: Article = {
+        id: values[0],
+        nom: values[1],
+        categorie: values[2] || undefined,
+        description: values[3] || undefined,
+        prixJour: parseFloat(values[4]),
+        qteTotale: parseInt(values[5]),
+        qteCasse: parseInt(values[6]),
+        seuilAlerte: values[7] ? parseInt(values[7]) : undefined,
+        cautionUnit: values[8] ? parseFloat(values[8]) : undefined,
+        actif: values[9] === "1"
+      };
+      articles.push(article);
+    }
+  }
+
+  await db.transaction("rw", db.articles, async () => {
+    for (const article of articles) {
+      const existing = await db.articles.get(article.id);
+      if (existing) {
+        await db.articles.update(article.id, article);
       } else {
-        if (ch === '"') inQ = true;
-        else if (ch === SEP) { out.push(cur); cur = ''; }
-        else { cur += ch; }
+        await db.articles.add(article);
       }
     }
-    out.push(cur);
-    return out;
   });
 }
 
-export async function exportArticlesCSV() {
-  const headers = ['id','nom','categorie','prixJour','qteTotale','qteCasse','seuilAlerte','cautionUnit','actif'];
-  const rows = await db.articles.toArray();
-  const csv = [headers.join(SEP), ...rows.map(a => [a.id,a.nom,a.categorie ?? '',a.prixJour,a.qteTotale,a.qteCasse,a.seuilAlerte ?? '',a.cautionUnit ?? '',a.actif ? 1 : 0].map(escapeCSV).join(SEP))].join('\n');
-  return csv;
-}
+// Implement importReservationsFromCsv and importReservationItemsFromCsv similarly if needed
 
-export async function importArticlesCSV(csv: string) {
-  const rows = parseCSV(csv);
-  const header = rows[0]?.map(h => h.trim()) || [];
-  const data = rows.slice(1);
-  const idx = (name: string) => header.indexOf(name);
-  const collisions: string[] = [];
-  await db.transaction('rw', db.articles, async () => {
-    for (const r of data) {
-      const a: Article = {
-        id: r[idx('id')],
-        nom: r[idx('nom')],
-        categorie: r[idx('categorie')] || undefined,
-        description: undefined,
-        prixJour: Number(r[idx('prixJour')]) || 0,
-        qteTotale: Number(r[idx('qteTotale')]) || 0,
-        qteCasse: Number(r[idx('qteCasse')]) || 0,
-        seuilAlerte: r[idx('seuilAlerte')] ? Number(r[idx('seuilAlerte')]) : undefined,
-        cautionUnit: r[idx('cautionUnit')] ? Number(r[idx('cautionUnit')]) : undefined,
-        actif: r[idx('actif')] === '1' || r[idx('actif')]?.toLowerCase() === 'true',
-      };
-      const exists = await db.articles.get(a.id);
-      if (exists) { collisions.push(a.id); continue; }
-      await db.articles.add(a);
-    }
-  });
-  return { collisions };
-}
 
-export async function exportReservationsCSV() {
-  return 'id;dateDebut;dateFin;clientNom;clientTel;note;statut;acompte;createdAt;updatedAt\n';
-}
-
-export async function exportReservationItemsCSV() {
-  return 'id;reservationId;articleId;qte;prixJourSnapshot\n';
-}
