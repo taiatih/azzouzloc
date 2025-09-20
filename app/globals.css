@@ -44,6 +44,7 @@ body {
 /* Custom styles for mobile-first design */
 .mobile-nav {
   @apply fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 6px);
 }
 
 .mobile-nav-item {

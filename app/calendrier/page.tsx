@@ -16,6 +16,8 @@ export default function CalendrierPage() {
   const [reservations, setReservations] = useState<(Reservation & { items: (ReservationItem & { article: Article })[] })[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
+  const [includeDrafts, setIncludeDrafts] = useState(true);
+  const [includeCanceled, setIncludeCanceled] = useState(false);
 
   useEffect(() => {
     loadReservations();
@@ -23,11 +25,15 @@ export default function CalendrierPage() {
 
   useEffect(() => {
     generateCalendar();
+  }, [currentDate, reservations, includeDrafts, includeCanceled]);
+
+  useEffect(() => {
+    generateCalendar();
   }, [currentDate, reservations]);
 
   const loadReservations = async () => {
     try {
-      const reservationsData = await reservationHelpers.listByStatus(['confirmee', 'en_cours']);
+      const reservationsData = await reservationHelpers.list();
       const itemsData = await reservationItemHelpers.list();
       const articlesData = await articleHelpers.list();
 
@@ -64,6 +70,9 @@ export default function CalendrierPage() {
   };
 
   const generateCalendar = () => {
+    const allowed: string[] = ['confirmee','en_cours'];
+    if (includeDrafts) allowed.push('brouillon');
+    if (includeCanceled) allowed.push('annulee');
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     
@@ -88,7 +97,7 @@ export default function CalendrierPage() {
       
       // Trouver les réservations pour ce jour
       const dayReservations = reservations.filter(reservation => {
-        return dateStr >= reservation.dateDebut && dateStr <= reservation.dateFin;
+        return allowed.includes(reservation.statut) && dateStr >= reservation.dateDebut && dateStr <= reservation.dateFin;
       });
       
       calendarDays.push({
@@ -177,6 +186,16 @@ export default function CalendrierPage() {
           >
             →
           </button>
+        </div>
+        <div className="flex items-center gap-4 mt-3 text-sm">
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={includeDrafts} onChange={(e)=>setIncludeDrafts(e.target.checked)} />
+            Inclure brouillons
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={includeCanceled} onChange={(e)=>setIncludeCanceled(e.target.checked)} />
+            Inclure annulées
+          </label>
         </div>
       </div>
 
