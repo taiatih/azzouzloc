@@ -132,6 +132,16 @@ export default function Dashboard() {
               <span className="text-purple-600">📋</span>
             </div>
           </Link>
+
+          <Link href="/settings" className="block p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-gray-900">Paramètres</div>
+                <div className="text-sm text-gray-600">Devise, catégories, langue</div>
+              </div>
+              <span className="text-gray-600">⚙️</span>
+            </div>
+          </Link>
         </div>
       </div>
     </div>

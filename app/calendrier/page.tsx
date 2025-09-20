@@ -137,8 +137,10 @@ export default function CalendrierPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmee': return 'bg-blue-500';
       case 'en_cours': return 'bg-green-500';
+      case 'brouillon': return 'bg-gray-400';
+      case 'cloturee': return 'bg-purple-500';
+      case 'annulee': return 'bg-red-500';
       default: return 'bg-gray-500';
     }
   };
@@ -225,7 +227,7 @@ export default function CalendrierPage() {
                   ${isToday ? 'ring-2 ring-blue-500' : ''}
                 `}
               >
-                <div className={`text-sm font-medium mb-1 ${isToday ? 'text-blue-600' : ''}`}>
+                <div className={`inline-flex items-center justify-center size-6 text-sm font-medium rounded-full ${isToday ? 'bg-blue-100 text-blue-700' : ''} ${selectedDay && selectedDay.date.toDateString()===day.date.toDateString() ? 'bg-blue-600 text-white' : ''}`}>
                   {day.date.getDate()}
                 </div>
                 
@@ -289,7 +291,7 @@ export default function CalendrierPage() {
                       )}
                     </div>
                     <span className={`inline-flex px-2 py-1 text-xs rounded-full text-white ${getStatusColor(reservation.statut)}`}>
-                      {reservation.statut === 'confirmee' ? 'Confirmée' : 'En cours'}
+                      {reservation.statut}
                     </span>
                   </div>
                   

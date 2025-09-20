@@ -13,7 +13,8 @@ interface ReservationWithDetails extends Reservation {
 export default function ReservationsPage() {
   const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | Statut>('all');
+  const [tab, setTab] = useState<'all'|'past'|'current'|'upcoming'|'drafts'>('all');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     loadReservations();
@@ -127,9 +128,19 @@ export default function ReservationsPage() {
     }
   };
 
-  const filteredReservations = filter === 'all' 
-    ? reservations 
-    : reservations.filter(r => r.statut === filter);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const filteredReservations = reservations.filter((r) => {
+    if (search) {
+      const s = search.toLowerCase();
+      const match = (r.clientNom||'').toLowerCase().includes(s) || (r.clientTel||'').toLowerCase().includes(s);
+      if (!match) return false;
+    }
+    if (tab === 'drafts') return r.statut === 'brouillon';
+    if (tab === 'current') return r.dateDebut <= todayStr && r.dateFin >= todayStr && r.statut === 'en_cours';
+    if (tab === 'upcoming') return r.dateDebut > todayStr && (r.statut === 'en_cours' || r.statut === 'brouillon');
+    if (tab === 'past') return r.dateFin < todayStr && (r.statut === 'cloturee' || r.statut === 'annulee');
+    return true;
+  });
 
   if (loading) {
     return (
@@ -153,30 +164,20 @@ export default function ReservationsPage() {
 
       {/* Filtres */}
       <div className="card">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1 rounded-full text-sm ${
-              filter === 'all' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Toutes
-          </button>
-          {(['brouillon', 'confirmee', 'en_cours', 'cloturee', 'annulee'] as Statut[]).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-3 py-1 rounded-full text-sm ${
-                filter === status 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {getStatusLabel(status)}
-            </button>
+        <div className="flex flex-wrap gap-2 items-center">
+          {([
+            {k:'all', label:'Toutes'},
+            {k:'current', label:'En cours'},
+            {k:'upcoming', label:'À venir'},
+            {k:'past', label:'Passées'},
+            {k:'drafts', label:'Brouillons'},
+          ] as {k: typeof tab, label: string}[]).map(t => (
+            <button key={t.k}
+              onClick={()=>setTab(t.k)}
+              className={`px-3 py-1 rounded-full text-sm ${tab===t.k?'bg-blue-600 text-white':'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >{t.label}</button>
           ))}
+          <input placeholder="Recherche client/téléphone" value={search} onChange={(e)=>setSearch(e.target.value)} className="input-field ml-auto w-full sm:w-64" />
         </div>
       </div>
 
@@ -228,18 +229,20 @@ export default function ReservationsPage() {
                     className="text-xs border border-gray-300 rounded px-2 py-1"
                   >
                     <option value="brouillon">Brouillon</option>
-                    <option value="confirmee">Confirmée</option>
                     <option value="en_cours">En cours</option>
                     <option value="cloturee">Clôturée</option>
                     <option value="annulee">Annulée</option>
                   </select>
-                  
-                  <button
-                    onClick={() => handleDelete(reservation.id)}
-                    className="text-xs text-red-600 hover:text-red-800"
-                  >
-                    Supprimer
-                  </button>
+                  <div className="flex gap-2">
+                    {reservation.statut==='brouillon' && (
+                      <button onClick={()=>handleStatusChange(reservation.id,'en_cours')} className="text-xs text-green-600">Démarrer</button>
+                    )}
+                    {reservation.statut==='en_cours' && (
+                      <button onClick={()=>handleStatusChange(reservation.id,'cloturee')} className="text-xs text-purple-600">Clôturer</button>
+                    )}
+                    <Link href={`/reservations/edit?id=${reservation.id}`} className="text-xs text-blue-600">Modifier</Link>
+                    <button onClick={() => handleDelete(reservation.id)} className="text-xs text-red-600 hover:text-red-800">Supprimer</button>
+                  </div>
                 </div>
               </div>
 

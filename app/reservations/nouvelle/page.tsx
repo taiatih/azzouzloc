@@ -6,6 +6,7 @@ import { articleHelpers, reservationHelpers, reservationItemHelpers } from '@/li
 import { qteDisponible } from '@/lib/availability';
 import { Article, Reservation, ReservationItem } from '@/lib/models';
 import DatePicker from 'react-datepicker';
+import MultiArticleSelect from '@/components/MultiArticleSelect';
 import 'react-datepicker/dist/react-datepicker.css';
 import { registerLocale, setDefaultLocale } from 'react-datepicker';
 import { fr } from 'date-fns/locale/fr';
@@ -289,68 +290,20 @@ export default function NouvelleReservationPage() {
         <div className="card">
           <h2 className="text-lg font-semibold mb-4">Ajouter des articles</h2>
           
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Rechercher un article..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-field"
-            />
-          </div>
-
           {isUpdatingDisponibilites ? (
             <div className="text-center py-8 text-gray-500">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
               Mise à jour des disponibilités...
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredArticles.length > 0 ? (
-                filteredArticles.map((article) => (
-                  <div key={article.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{article.nom}</h3>
-                        {article.categorie && (
-                          <p className="text-sm text-gray-600">{article.categorie}</p>
-                        )}
-                        <div className="mt-1 text-sm">
-                          <span className="text-gray-500">Prix/jour:</span>
-                          <span className="ml-1 font-medium">{article.prixJour} DA</span>
-                          <span className="ml-4 text-gray-500">Disponible:</span>
-                          <span className={`ml-1 font-medium ${article.qteDisponible > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {article.qteDisponible}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="ml-4 w-20">
-                        <input
-                          type="number"
-                          min="0"
-                          max={article.qteDisponible}
-                          value={selectedArticles.find(a => a.id === article.id)?.qteDemandee || 0}
-                          onChange={(e) => handleArticleQteChange(article.id, parseInt(e.target.value) || 0)}
-                          className="input-field text-center"
-                          disabled={article.qteDisponible === 0}
-                        />
-                      </div>
-                    </div>
-                    
-                    {(selectedArticles.find(a => a.id === article.id)?.qteDemandee || 0) > article.qteDisponible && (
-                      <div className="mt-2 text-sm text-red-600">
-                        Quantité demandée supérieure à la disponibilité
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  Aucun article trouvé ou disponible pour les dates sélectionnées.
-                </div>
-              )}
-            </div>
+            <MultiArticleSelect
+              articles={articlesWithAvailability}
+              value={selectedArticles.map(a => ({ id: a.id, qte: a.qteDemandee }))}
+              onChange={(vals) => {
+                const next = articlesWithAvailability.map(a => ({ ...a, qteDemandee: vals.find(v=>v.id===a.id)?.qte || 0 }));
+                setSelectedArticles(next.filter(a => a.qteDemandee>0));
+              }}
+            />
           )}
         </div>
 
