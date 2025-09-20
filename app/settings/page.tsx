@@ -9,6 +9,7 @@ export default function SettingsPage() {
     langue: 'fr',
     pin: '',
     confirmPin: '',
+    syncPin: '',
   });
   const [currentPin, setCurrentPin] = useState('');
   const [showPinForm, setShowPinForm] = useState(false);
@@ -273,6 +274,28 @@ export default function SettingsPage() {
               </div>
             </form>
           )}
+        </div>
+      </div>
+
+      {/* Synchronisation (Supabase) */}
+      <div className="card">
+        <h2 className="text-lg font-semibold mb-4">Synchronisation</h2>
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600">Activez la synchronisation multi‑appareils. Code PIN requis (défini par l’administrateur).</p>
+          <div className="flex gap-2 items-center">
+            <input type="password" value={settings.syncPin} onChange={(e)=>setSettings(s=>({...s, syncPin:e.target.value}))} className="input-field w-40" placeholder="Code PIN" />
+            <button className="btn-primary text-sm" onClick={async ()=>{
+              const { unlockSync } = await import('@/lib/sync');
+              await unlockSync(settings.syncPin);
+              alert('Synchronisation déverrouillée.');
+            }}>Déverrouiller</button>
+            <button className="btn-secondary text-sm" onClick={async ()=>{
+              const { runSync } = await import('@/lib/sync');
+              const r = await runSync();
+              alert(r.ok ? 'Synchronisation terminée' : 'Synchronisation verrouillée ou en erreur');
+            }}>Synchroniser maintenant</button>
+          </div>
+          <p className="text-xs text-gray-500">La synchronisation automatique s’exécute toutes les 15 minutes lorsque le PIN est déverrouillé.</p>
         </div>
       </div>
 
