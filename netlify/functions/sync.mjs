@@ -6,14 +6,16 @@ const APP_PIN = process.env.APP_PIN;
 
 const supabase = createClient(url, serviceRole, { auth: { autoRefreshToken: false, persistSession: false } });
 
-export default async (req, res) => {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+const headers = { 'Content-Type': 'application/json' };
+
+export default async (event, context) => {
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
-    const pin = req.headers['x-pin'];
-    if (!pin || String(pin) !== String(APP_PIN)) return res.status(401).json({ error: 'Unauthorized' });
+    const pin = event.headers['x-pin'] || event.headers['X-Pin'];
+    if (!pin || String(pin) !== String(APP_PIN)) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
 
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
     const { push = { articles: [], reservations: [], reservationItems: [] } } = body;
 
     // Upsert order: articles -> reservations (with anti-overbooking) -> items
@@ -115,14 +117,14 @@ export default async (req, res) => {
     if (rRes.error) throw rRes.error;
     if (iRes.error) throw iRes.error;
 
-    return res.status(200).json({
+    return { statusCode: 200, headers, body: JSON.stringify({
       articles: aRes.data || [],
       reservations: rRes.data || [],
       reservationItems: iRes.data || [],
       serverTime: new Date().toISOString(),
       errors,
-    });
+    }) };
   } catch (e) {
-    return res.status(500).json({ error: e.message || 'Sync failed' });
+    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message || 'Sync failed' }) };
   }
 }
