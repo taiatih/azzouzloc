@@ -8,15 +8,15 @@ const supabase = createClient(url, serviceRole, { auth: { autoRefreshToken: fals
 
 const headers = { 'Content-Type': 'application/json' };
 
-export default async (event, context) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
+export default async (request, context) => {
+  if (request.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers });
 
   try {
-    const pin = event.headers['x-pin'] || event.headers['X-Pin'];
-    if (!pin || String(pin) !== String(APP_PIN)) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
+    const pin = request.headers.get('x-pin') || request.headers.get('X-Pin');
+    if (!pin || String(pin) !== String(APP_PIN)) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
 
-    const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
-    const { push = { articles: [], reservations: [], reservationItems: [] } } = body;
+    const body = await request.json().catch(()=>({}));
+    const { push = { articles: [], reservations: [], reservationItems: [] } } = body || {};
 
     // Upsert order: articles -> reservations (with anti-overbooking) -> items
     const errors = [];
@@ -117,14 +117,14 @@ export default async (event, context) => {
     if (rRes.error) throw rRes.error;
     if (iRes.error) throw iRes.error;
 
-    return { statusCode: 200, headers, body: JSON.stringify({
+    return new Response(JSON.stringify({
       articles: aRes.data || [],
       reservations: rRes.data || [],
       reservationItems: iRes.data || [],
       serverTime: new Date().toISOString(),
       errors,
-    }) };
+    }), { status: 200, headers });
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message || 'Sync failed' }) };
+    return new Response(JSON.stringify({ error: e.message || 'Sync failed' }), { status: 500, headers });
   }
 }
