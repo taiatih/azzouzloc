@@ -18,13 +18,33 @@ export default async (request, context) => {
     const body = await request.json().catch(()=>({}));
     const { push = { articles: [], reservations: [], reservationItems: [] } } = body || {};
 
-    // Upsert order: articles -> reservations (with anti-overbooking) -> items
     const errors = [];
 
+    const num = (v, d=0) => (v===null||v===undefined||v==='') ? d : Number(v);
+    const str = (v, d='') => (v===null||v===undefined) ? d : String(v);
+    const bool = (v, d=true) => (v===null||v===undefined) ? d : Boolean(v);
+
     if (Array.isArray(push.articles) && push.articles.length) {
-      const rows = push.articles.map(a => ({ ...a, updated_at: a.updated_at || new Date().toISOString() }));
-      const { error } = await supabase.from('articles').upsert(rows, { onConflict: 'id' });
-      if (error) throw error;
+      try {
+        const now = new Date().toISOString();
+        const rows = push.articles.map(a => ({
+          id: str(a.id),
+          nom: str(a.nom),
+          categorie: a.categorie ?? null,
+          description: a.description ?? null,
+          prixJour: num(a.prixJour, 0),
+          qteTotale: num(a.qteTotale, 0),
+          qteCasse: num(a.qteCasse, 0),
+          seuilAlerte: (a.seuilAlerte===null||a.seuilAlerte===undefined||a.seuilAlerte==='') ? null : num(a.seuilAlerte),
+          cautionUnit: (a.cautionUnit===null||a.cautionUnit===undefined||a.cautionUnit==='') ? null : num(a.cautionUnit),
+          actif: bool(a.actif, true),
+          updated_at: a.updated_at || now,
+        }));
+        const { error } = await supabase.from('articles').upsert(rows, { onConflict: 'id' });
+        if (error) errors.push({ phase:'articles', message: error.message });
+      } catch (e) {
+        errors.push({ phase:'articles', message: e.message||String(e) });
+      }
     }
 
     const reservations = Array.isArray(push.reservations) ? push.reservations : [];
@@ -32,26 +52,32 @@ export default async (request, context) => {
 
     const allowedReservationIds = new Set();
     if (reservations.length) {
-      for (const r of reservations) {
-        // Always validate when statut en_cours
-        if (r.statut === 'en_cours') {
-          // Fetch existing to know previous statut (optional)
-          const existing = await supabase.from('reservations').select('statut').eq('id', r.id).maybeSingle();
-          const prevStatut = existing.data?.statut || 'brouillon';
+      for (const r0 of reservations) {
+        const r = {
+          id: str(r0.id),
+          dateDebut: str(r0.dateDebut),
+          dateFin: str(r0.dateFin),
+          clientNom: r0.clientNom ?? null,
+          clientTel: r0.clientTel ?? null,
+          note: r0.note ?? null,
+          statut: str(r0.statut||'brouillon'),
+          acompte: (r0.acompte===null||r0.acompte===undefined||r0.acompte==='') ? null : num(r0.acompte),
+          createdAt: str(r0.createdAt || new Date().toISOString()),
+          updatedAt: str(r0.updatedAt || new Date().toISOString()),
+        };
 
-          // Determine candidate items
+        if (r.statut === 'en_cours') {
           const candItems = items.filter(it => it.reservationId === r.id);
           let cand = candItems;
           if (cand.length === 0) {
             const dbItems = await supabase.from('reservation_items').select('*').eq('reservationId', r.id);
-            if (dbItems.error) { errors.push({ reservationId: r.id, reason: 'items_fetch_failed' }); continue; }
+            if (dbItems.error) { errors.push({ reservationId: r.id, reason: 'items_fetch_failed' }); allowedReservationIds.add(r.id); continue; }
             cand = dbItems.data || [];
           }
 
-          // For each item, compute availability
           let violation = null;
-          for (const it of cand) {
-            // Fetch overlapping en_cours reservations excluding current
+          for (const it0 of cand) {
+            const it = { articleId: str(it0.articleId), qte: num(it0.qte, 0) };
             const overRes = await supabase
               .from('reservations')
               .select('id')
@@ -75,47 +101,53 @@ export default async (request, context) => {
             const artRes = await supabase.from('articles').select('qteTotale, qteCasse').eq('id', it.articleId).maybeSingle();
             if (artRes.error || !artRes.data) { violation = { articleId: it.articleId, reason: 'article_missing' }; break; }
             const available = Math.max(0, (artRes.data.qteTotale||0) - (artRes.data.qteCasse||0) - reserved);
-            if ((it.qte||0) > available) {
-              violation = { articleId: it.articleId, requested: it.qte, available };
-              break;
-            }
+            if ((it.qte||0) > available) { violation = { articleId: it.articleId, requested: it.qte, available }; break; }
           }
 
-          if (violation) {
-            errors.push({ reservationId: r.id, reason: 'overbook', ...violation });
-            continue; // skip upsert for this reservation
-          }
+          if (violation) { errors.push({ reservationId: r.id, reason: 'overbook', ...violation }); continue; }
         }
         allowedReservationIds.add(r.id);
       }
 
-      // Upsert only allowed reservations
-      const rows = reservations.filter(r => allowedReservationIds.has(r.id)).map(r => ({ ...r, updatedAt: r.updatedAt || new Date().toISOString() }));
+      const now = new Date().toISOString();
+      const rows = reservations.filter(r => allowedReservationIds.has(r.id)).map(r0 => ({
+        id: str(r0.id),
+        dateDebut: str(r0.dateDebut),
+        dateFin: str(r0.dateFin),
+        clientNom: r0.clientNom ?? null,
+        clientTel: r0.clientTel ?? null,
+        note: r0.note ?? null,
+        statut: str(r0.statut||'brouillon'),
+        acompte: (r0.acompte===null||r0.acompte===undefined||r0.acompte==='') ? null : num(r0.acompte),
+        createdAt: str(r0.createdAt || now),
+        updatedAt: str(r0.updatedAt || now),
+      }));
       if (rows.length) {
         const { error } = await supabase.from('reservations').upsert(rows, { onConflict: 'id' });
-        if (error) throw error;
+        if (error) errors.push({ phase:'reservations', message: error.message });
       }
     }
 
     if (items.length) {
-      // Upsert only items for allowed reservations
-      const rows = items.filter(i => allowedReservationIds.has(i.reservationId)).map(i => ({ ...i, updated_at: i.updated_at || new Date().toISOString() }));
+      const now = new Date().toISOString();
+      const rows = items
+        .filter(i => allowedReservationIds.has(i.reservationId))
+        .map(i => ({
+          id: str(i.id), reservationId: str(i.reservationId), articleId: str(i.articleId), qte: num(i.qte,0), prixJourSnapshot: num(i.prixJourSnapshot, 0), updated_at: i.updated_at || now,
+        }));
       if (rows.length) {
         const { error } = await supabase.from('reservation_items').upsert(rows, { onConflict: 'id' });
-        if (error) throw error;
+        if (error) errors.push({ phase:'reservation_items', message: error.message });
       }
     }
 
-    // Pull (return all for v1)
-    const [aRes, rRes, iRes] = await Promise.all([
-      supabase.from('articles').select('*'),
-      supabase.from('reservations').select('*'),
-      supabase.from('reservation_items').select('*'),
-    ]);
+    let aRes = await supabase.from('articles').select('*');
+    let rRes = await supabase.from('reservations').select('*');
+    let iRes = await supabase.from('reservation_items').select('*');
 
-    if (aRes.error) throw aRes.error;
-    if (rRes.error) throw rRes.error;
-    if (iRes.error) throw iRes.error;
+    if (aRes.error) { errors.push({ phase:'pull_articles', message: aRes.error.message }); aRes = { data: [] }; }
+    if (rRes.error) { errors.push({ phase:'pull_reservations', message: rRes.error.message }); rRes = { data: [] }; }
+    if (iRes.error) { errors.push({ phase:'pull_reservation_items', message: iRes.error.message }); iRes = { data: [] }; }
 
     return new Response(JSON.stringify({
       articles: aRes.data || [],

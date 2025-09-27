@@ -15,28 +15,37 @@ export async function runSync() {
   if (!isSyncUnlocked()) return { ok: false, reason: 'locked' };
   const pin = localStorage.getItem(SYNC_PIN_OK)!;
 
-  // Gather local data (push)
   const [articles, reservations, reservationItems] = await Promise.all([
     articleHelpers.list(), reservationHelpers.list(), reservationItemHelpers.list()
   ]);
 
-  const resp = await fetch('/.netlify/functions/sync', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-pin': pin },
-    body: JSON.stringify({ push: { articles, reservations, reservationItems } }),
-  });
-  if (!resp.ok) return { ok: false, status: resp.status };
-  const data = await resp.json();
+  let resp;
+  try {
+    resp = await fetch('/.netlify/functions/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-pin': pin },
+      body: JSON.stringify({ push: { articles, reservations, reservationItems } }),
+    });
+  } catch (e:any) {
+    return { ok: false, network: true, message: e?.message || 'Network error' };
+  }
 
-  // Merge (v1 simple: replace)
+  let payload: any = null;
+  if (!resp.ok) {
+    try { payload = await resp.json(); } catch { try { payload = { raw: await resp.text() }; } catch {} }
+    return { ok: false, status: resp.status, body: payload };
+  }
+
+  try { payload = await resp.json(); } catch { payload = {}; }
+
   await db.transaction('rw', db.articles, db.reservations, db.reservationItems, async ()=>{
     await db.articles.clear();
     await db.reservations.clear();
     await db.reservationItems.clear();
-    if (data.articles?.length) await db.articles.bulkAdd(data.articles);
-    if (data.reservations?.length) await db.reservations.bulkAdd(data.reservations);
-    if (data.reservationItems?.length) await db.reservationItems.bulkAdd(data.reservationItems);
+    if (payload.articles?.length) await db.articles.bulkAdd(payload.articles);
+    if (payload.reservations?.length) await db.reservations.bulkAdd(payload.reservations);
+    if (payload.reservationItems?.length) await db.reservationItems.bulkAdd(payload.reservationItems);
   });
-  localStorage.setItem(LAST_SYNC_KEY, data.serverTime || new Date().toISOString());
-  return { ok: true };
+  localStorage.setItem(LAST_SYNC_KEY, payload.serverTime || new Date().toISOString());
+  return { ok: true, errors: payload.errors || [] };
 }

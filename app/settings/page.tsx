@@ -291,8 +291,19 @@ export default function SettingsPage() {
             }}>Déverrouiller</button>
             <button className="btn-secondary text-sm" onClick={async ()=>{
               const { runSync } = await import('@/lib/sync');
-              const r = await runSync();
-              alert(r.ok ? 'Synchronisation terminée' : 'Synchronisation verrouillée ou en erreur');
+              const r: any = await runSync();
+              if (r.ok) {
+                if (r.errors && r.errors.length) {
+                  console.warn('Sync warnings', r.errors);
+                  alert('Synchronisation terminée avec avertissements. Voir la console pour les détails.');
+                } else {
+                  alert('Synchronisation terminée');
+                }
+              } else {
+                console.error('Sync error', r);
+                const msg = r.network ? 'Erreur réseau' : (r.body?.error || r.body?.message || `Erreur ${r.status}`);
+                alert(`Synchronisation échouée: ${msg}`);
+              }
             }}>Synchroniser maintenant</button>
           </div>
           <p className="text-xs text-gray-500">La synchronisation automatique s’exécute toutes les 15 minutes lorsque le PIN est déverrouillé.</p>
